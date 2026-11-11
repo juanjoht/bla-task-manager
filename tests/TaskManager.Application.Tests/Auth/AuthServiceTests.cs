@@ -22,7 +22,7 @@ public class AuthServiceTests
     public AuthServiceTests()
     {
         _passwordHasher.Setup(h => h.Hash(It.IsAny<string>())).Returns(HashedPassword);
-        _sut = new AuthService(_users.Object, _passwordHasher.Object, _tokenGenerator.Object, new FixedTimeProvider(UtcNow));
+        _sut = new AuthService(_users.Object, _passwordHasher.Object, _tokenGenerator.Object, new FixedClock(UtcNow, DateOnly.FromDateTime(UtcNow)));
     }
 
     private static User ExistingUser() => new("demo@ballastlane.test", "Demo User", HashedPassword, UtcNow);

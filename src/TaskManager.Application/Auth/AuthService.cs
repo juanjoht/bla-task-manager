@@ -1,5 +1,6 @@
 using TaskManager.Application.Abstractions.Persistence;
 using TaskManager.Application.Abstractions.Security;
+using TaskManager.Application.Abstractions.Time;
 using TaskManager.Application.Common.Exceptions;
 using TaskManager.Domain.Entities;
 
@@ -9,7 +10,7 @@ public sealed class AuthService(
     IUserRepository users,
     IPasswordHasher passwordHasher,
     ITokenGenerator tokenGenerator,
-    TimeProvider timeProvider)
+    IClock clock)
 {
     private const string InvalidCredentials = "Invalid email or password.";
 
@@ -22,7 +23,7 @@ public sealed class AuthService(
         }
 
         var passwordHash = passwordHasher.Hash(request.Password);
-        var user = new User(request.Email, request.Name, passwordHash, timeProvider.GetUtcNow().UtcDateTime);
+        var user = new User(request.Email, request.Name, passwordHash, clock.UtcNow);
 
         await users.AddAsync(user, cancellationToken);
         return ToDto(user);
