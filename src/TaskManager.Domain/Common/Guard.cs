@@ -32,9 +32,9 @@ internal static class Guard
     public static string? OptionalMaxLength(string? value, int maxLength, string field) =>
         string.IsNullOrWhiteSpace(value) ? null : MaxLength(value.Trim(), maxLength, field);
 
-    public static void NotInPast(DateOnly date, DateTime utcNow, string field)
+    public static void NotInPast(DateOnly date, DateOnly today, string field)
     {
-        if (date < DateOnly.FromDateTime(utcNow))
+        if (date < today)
         {
             throw new DomainException($"{field} cannot be in the past.");
         }

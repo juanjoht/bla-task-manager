@@ -20,7 +20,7 @@ public sealed class TaskItem
     public TaskItem(Guid userId, string title, string? description, DateOnly dueDate, DateOnly today, DateTime utcNow)
     {
         Guard.NotEmpty(userId, "User id");
-        Guard.NotInPast(dueDate, utcNow, "Due date");
+        Guard.NotInPast(dueDate, today, "Due date");
 
         Id = Guid.NewGuid();
         UserId = userId;
