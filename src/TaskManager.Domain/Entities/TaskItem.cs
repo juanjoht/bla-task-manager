@@ -1,5 +1,5 @@
+using TaskManager.Domain.Common;
 using TaskManager.Domain.Enums;
-using TaskManager.Domain.Exceptions;
 
 namespace TaskManager.Domain.Entities;
 
@@ -17,86 +17,37 @@ public sealed class TaskItem
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
-    // Required by EF Core to materialize entities from the database.
+    public TaskItem(Guid userId, string title, string? description, DateOnly dueDate, DateTime utcNow)
+    {
+        Guard.NotEmpty(userId, "User id");
+        Guard.NotInPast(dueDate, utcNow, "Due date");
+
+        Id = Guid.NewGuid();
+        UserId = userId;
+        Title = Guard.RequiredMaxLength(title, TitleMaxLength, "Title");
+        Description = Guard.OptionalMaxLength(description, DescriptionMaxLength, "Description");
+        Status = TaskItemStatus.Pending;
+        DueDate = dueDate;
+        CreatedAt = utcNow;
+        UpdatedAt = utcNow;
+    }
+
+    // Used only by EF Core to load existing rows (it must not re-run creation rules such as "due date not in the past").
     private TaskItem()
     {
     }
 
-    public static TaskItem Create(Guid userId, string title, string? description, DateOnly dueDate, DateTime utcNow)
-    {
-        if (userId == Guid.Empty)
-        {
-            throw new DomainException("User id is required.");
-        }
-
-        var validTitle = ValidateTitle(title);
-        var validDescription = ValidateDescription(description);
-
-        if (dueDate < DateOnly.FromDateTime(utcNow))
-        {
-            throw new DomainException("Due date cannot be in the past.");
-        }
-
-        return new TaskItem
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            Title = validTitle,
-            Description = validDescription,
-            Status = TaskItemStatus.Pending,
-            DueDate = dueDate,
-            CreatedAt = utcNow,
-            UpdatedAt = utcNow
-        };
-    }
-
     public void Update(string title, string? description, TaskItemStatus status, DateOnly dueDate, DateTime utcNow)
     {
-        // Validate everything before mutating so a failed update leaves the task unchanged.
-        var validTitle = ValidateTitle(title);
-        var validDescription = ValidateDescription(description);
-
-        if (!Enum.IsDefined(status))
-        {
-            throw new DomainException("Status is not valid.");
-        }
+        // Validate everything first, then assign: a failed update leaves the task unchanged.
+        var validTitle = Guard.RequiredMaxLength(title, TitleMaxLength, "Title");
+        var validDescription = Guard.OptionalMaxLength(description, DescriptionMaxLength, "Description");
+        Guard.Defined(status, "Status");
 
         Title = validTitle;
         Description = validDescription;
         Status = status;
         DueDate = dueDate;
         UpdatedAt = utcNow;
-    }
-
-    private static string ValidateTitle(string title)
-    {
-        if (string.IsNullOrWhiteSpace(title))
-        {
-            throw new DomainException("Title is required.");
-        }
-
-        var trimmed = title.Trim();
-        if (trimmed.Length > TitleMaxLength)
-        {
-            throw new DomainException($"Title cannot exceed {TitleMaxLength} characters.");
-        }
-
-        return trimmed;
-    }
-
-    private static string? ValidateDescription(string? description)
-    {
-        if (string.IsNullOrWhiteSpace(description))
-        {
-            return null;
-        }
-
-        var trimmed = description.Trim();
-        if (trimmed.Length > DescriptionMaxLength)
-        {
-            throw new DomainException($"Description cannot exceed {DescriptionMaxLength} characters.");
-        }
-
-        return trimmed;
     }
 }

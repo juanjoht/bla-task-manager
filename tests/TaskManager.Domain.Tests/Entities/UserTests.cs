@@ -12,7 +12,7 @@ public class UserTests
     [Fact]
     public void Create_WithValidData_SetsAllProperties()
     {
-        var user = User.Create("demo@ballastlane.test", "Demo User", ValidHash, UtcNow);
+        var user = new User("demo@ballastlane.test", "Demo User", ValidHash, UtcNow);
 
         user.Id.Should().NotBeEmpty();
         user.Email.Should().Be("demo@ballastlane.test");
@@ -25,7 +25,7 @@ public class UserTests
     public void Create_NormalizesEmailToTrimmedLowercase()
     {
         // Normalizing here makes "Demo@X.com" and "demo@x.com" the same account for the unique check.
-        var user = User.Create("  Demo@BallastLane.TEST ", "Demo User", ValidHash, UtcNow);
+        var user = new User("  Demo@BallastLane.TEST ", "Demo User", ValidHash, UtcNow);
 
         user.Email.Should().Be("demo@ballastlane.test");
     }
@@ -36,7 +36,7 @@ public class UserTests
     [InlineData("   ")]
     public void Create_WithMissingEmail_Throws(string? email)
     {
-        var act = () => User.Create(email!, "Demo User", ValidHash, UtcNow);
+        var act = () => new User(email!, "Demo User", ValidHash, UtcNow);
 
         act.Should().Throw<DomainException>().WithMessage("Email is required.");
     }
@@ -51,7 +51,7 @@ public class UserTests
     [InlineData("user@@domain.com")]
     public void Create_WithInvalidEmailFormat_Throws(string email)
     {
-        var act = () => User.Create(email, "Demo User", ValidHash, UtcNow);
+        var act = () => new User(email, "Demo User", ValidHash, UtcNow);
 
         act.Should().Throw<DomainException>().WithMessage("Email format is not valid.");
     }
@@ -62,7 +62,7 @@ public class UserTests
         const string domain = "@x.com";
         var email = new string('a', User.EmailMaxLength - domain.Length + 1) + domain;
 
-        var act = () => User.Create(email, "Demo User", ValidHash, UtcNow);
+        var act = () => new User(email, "Demo User", ValidHash, UtcNow);
 
         act.Should().Throw<DomainException>().WithMessage("Email cannot exceed 254 characters.");
     }
@@ -73,7 +73,7 @@ public class UserTests
     [InlineData("   ")]
     public void Create_WithMissingName_Throws(string? name)
     {
-        var act = () => User.Create("demo@ballastlane.test", name!, ValidHash, UtcNow);
+        var act = () => new User("demo@ballastlane.test", name!, ValidHash, UtcNow);
 
         act.Should().Throw<DomainException>().WithMessage("Name is required.");
     }
@@ -81,7 +81,7 @@ public class UserTests
     [Fact]
     public void Create_TrimsName()
     {
-        var user = User.Create("demo@ballastlane.test", "  Demo User  ", ValidHash, UtcNow);
+        var user = new User("demo@ballastlane.test", "  Demo User  ", ValidHash, UtcNow);
 
         user.Name.Should().Be("Demo User");
     }
@@ -91,7 +91,7 @@ public class UserTests
     {
         var name = new string('a', User.NameMaxLength + 1);
 
-        var act = () => User.Create("demo@ballastlane.test", name, ValidHash, UtcNow);
+        var act = () => new User("demo@ballastlane.test", name, ValidHash, UtcNow);
 
         act.Should().Throw<DomainException>().WithMessage("Name cannot exceed 100 characters.");
     }
@@ -102,7 +102,7 @@ public class UserTests
     [InlineData("   ")]
     public void Create_WithMissingPasswordHash_Throws(string? passwordHash)
     {
-        var act = () => User.Create("demo@ballastlane.test", "Demo User", passwordHash!, UtcNow);
+        var act = () => new User("demo@ballastlane.test", "Demo User", passwordHash!, UtcNow);
 
         act.Should().Throw<DomainException>().WithMessage("Password hash is required.");
     }

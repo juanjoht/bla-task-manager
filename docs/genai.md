@@ -37,7 +37,15 @@ This file is updated at the end of every phase and becomes the "Generative AI to
 **Design decisions reviewed by the human:**
 - Status enum named `TaskItemStatus`, not `TaskStatus`: avoids a clash with `System.Threading.Tasks.TaskStatus`,
   which is imported by implicit usings.
-- Entities have private setters and factory methods (`Create`) so an invalid entity can never exist.
+- Entities have private setters and validating constructors, so an invalid entity can never exist.
+- **Refactor step (human-driven):** the first green version used static `Create(...)` factories with inline checks.
+  After review it was judged harder to explain than necessary, so it was refactored to plain constructors plus a small
+  `Guard` helper (`Guard.RequiredMaxLength(title, TitleMaxLength, "Title")`), making each entity read as a list of rules.
+  Assertions were untouched (only the call syntax changed) and all 47 tests stayed green.
+- EF Core loads rows through a private parameterless constructor, so creation-only rules (due date not in the past)
+  are not re-applied to existing overdue tasks.
+- A fully anemic model (rules only in Application services) was considered and rejected: it is simpler to explain,
+  but it leaves the Domain layer with no behaviour and allows `task.Title = ""` from anywhere.
 - Time is passed in (`utcNow`) instead of reading `DateTime.UtcNow` inside the domain, which makes tests deterministic.
 - "Due date cannot be in the past" applies **only on creation**: an overdue task must remain editable (e.g. to mark it Done).
 - `Update` validates everything before mutating, so a failed update leaves the entity unchanged (covered by a test).

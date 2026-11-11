@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using TaskManager.Domain.Common;
 using TaskManager.Domain.Exceptions;
 
 namespace TaskManager.Domain.Entities;
@@ -14,43 +15,24 @@ public sealed partial class User
     public string PasswordHash { get; private set; } = string.Empty;
     public DateTime CreatedAt { get; private set; }
 
-    // Required by EF Core to materialize entities from the database.
+    public User(string email, string name, string passwordHash, DateTime utcNow)
+    {
+        Id = Guid.NewGuid();
+        Email = NormalizeEmail(email);
+        Name = Guard.RequiredMaxLength(name, NameMaxLength, "Name");
+        PasswordHash = Guard.Required(passwordHash, "Password hash");
+        CreatedAt = utcNow;
+    }
+
+    // Used only by EF Core to load existing rows.
     private User()
     {
     }
 
-    public static User Create(string email, string name, string passwordHash, DateTime utcNow)
+    // Lower-cased so "Demo@X.com" and "demo@x.com" are the same account for the uniqueness check.
+    private static string NormalizeEmail(string email)
     {
-        var validEmail = ValidateEmail(email);
-        var validName = ValidateName(name);
-
-        if (string.IsNullOrWhiteSpace(passwordHash))
-        {
-            throw new DomainException("Password hash is required.");
-        }
-
-        return new User
-        {
-            Id = Guid.NewGuid(),
-            Email = validEmail,
-            Name = validName,
-            PasswordHash = passwordHash,
-            CreatedAt = utcNow
-        };
-    }
-
-    private static string ValidateEmail(string email)
-    {
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            throw new DomainException("Email is required.");
-        }
-
-        var normalized = email.Trim().ToLowerInvariant();
-        if (normalized.Length > EmailMaxLength)
-        {
-            throw new DomainException($"Email cannot exceed {EmailMaxLength} characters.");
-        }
+        var normalized = Guard.RequiredMaxLength(email, EmailMaxLength, "Email").ToLowerInvariant();
 
         if (!EmailFormat().IsMatch(normalized))
         {
@@ -58,22 +40,6 @@ public sealed partial class User
         }
 
         return normalized;
-    }
-
-    private static string ValidateName(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new DomainException("Name is required.");
-        }
-
-        var trimmed = name.Trim();
-        if (trimmed.Length > NameMaxLength)
-        {
-            throw new DomainException($"Name cannot exceed {NameMaxLength} characters.");
-        }
-
-        return trimmed;
     }
 
     // Pragmatic check (something@domain.tld, no spaces, single @), not full RFC 5322.
