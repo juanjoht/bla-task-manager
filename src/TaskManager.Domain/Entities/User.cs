@@ -18,7 +18,7 @@ public sealed partial class User
     public User(string email, string name, string passwordHash, DateTime utcNow)
     {
         Id = Guid.NewGuid();
-        Email = NormalizeEmail(email);
+        Email = ValidateEmail(email);
         Name = Guard.RequiredMaxLength(name, NameMaxLength, "Name");
         PasswordHash = Guard.Required(passwordHash, "Password hash");
         CreatedAt = utcNow;
@@ -29,10 +29,12 @@ public sealed partial class User
     {
     }
 
-    // Lower-cased so "Demo@X.com" and "demo@x.com" are the same account for the uniqueness check.
-    private static string NormalizeEmail(string email)
+    // Single source of truth: "Demo@X.com" and "demo@x.com" are the same account (used by register and login).
+    public static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
+
+    private static string ValidateEmail(string email)
     {
-        var normalized = Guard.RequiredMaxLength(email, EmailMaxLength, "Email").ToLowerInvariant();
+        var normalized = NormalizeEmail(Guard.RequiredMaxLength(email, EmailMaxLength, "Email"));
 
         if (!EmailFormat().IsMatch(normalized))
         {
