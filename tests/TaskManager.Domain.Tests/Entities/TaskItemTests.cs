@@ -12,7 +12,7 @@ public class TaskItemTests
     private static readonly Guid UserId = Guid.NewGuid();
 
     private static TaskItem CreateValidTask() =>
-        new TaskItem(UserId, "Prepare demo", "Rehearse the presentation", Today.AddDays(2), UtcNow);
+        new TaskItem(UserId, "Prepare demo", "Rehearse the presentation", Today.AddDays(2), Today, UtcNow);
 
     // ---------- Create ----------
 
@@ -21,7 +21,7 @@ public class TaskItemTests
     {
         var dueDate = Today.AddDays(3);
 
-        var task = new TaskItem(UserId, "Prepare demo", "Rehearse the presentation", dueDate, UtcNow);
+        var task = new TaskItem(UserId, "Prepare demo", "Rehearse the presentation", dueDate, Today, UtcNow);
 
         task.Id.Should().NotBeEmpty();
         task.UserId.Should().Be(UserId);
@@ -52,7 +52,7 @@ public class TaskItemTests
     [Fact]
     public void Create_WithEmptyUserId_Throws()
     {
-        var act = () => new TaskItem(Guid.Empty, "Title", null, Today, UtcNow);
+        var act = () => new TaskItem(Guid.Empty, "Title", null, Today, Today, UtcNow);
 
         act.Should().Throw<DomainException>().WithMessage("User id is required.");
     }
@@ -63,7 +63,7 @@ public class TaskItemTests
     [InlineData("   ")]
     public void Create_WithMissingTitle_Throws(string? title)
     {
-        var act = () => new TaskItem(UserId, title!, null, Today, UtcNow);
+        var act = () => new TaskItem(UserId, title!, null, Today, Today, UtcNow);
 
         act.Should().Throw<DomainException>().WithMessage("Title is required.");
     }
@@ -71,7 +71,7 @@ public class TaskItemTests
     [Fact]
     public void Create_TrimsTitle()
     {
-        var task = new TaskItem(UserId, "  Prepare demo  ", null, Today, UtcNow);
+        var task = new TaskItem(UserId, "  Prepare demo  ", null, Today, Today, UtcNow);
 
         task.Title.Should().Be("Prepare demo");
     }
@@ -81,7 +81,7 @@ public class TaskItemTests
     {
         var title = new string('a', TaskItem.TitleMaxLength);
 
-        var task = new TaskItem(UserId, title, null, Today, UtcNow);
+        var task = new TaskItem(UserId, title, null, Today, Today, UtcNow);
 
         task.Title.Should().HaveLength(TaskItem.TitleMaxLength);
     }
@@ -91,7 +91,7 @@ public class TaskItemTests
     {
         var title = new string('a', TaskItem.TitleMaxLength + 1);
 
-        var act = () => new TaskItem(UserId, title, null, Today, UtcNow);
+        var act = () => new TaskItem(UserId, title, null, Today, Today, UtcNow);
 
         act.Should().Throw<DomainException>().WithMessage("Title cannot exceed 100 characters.");
     }
@@ -102,7 +102,7 @@ public class TaskItemTests
     [InlineData("   ")]
     public void Create_WithBlankDescription_StoresNull(string? description)
     {
-        var task = new TaskItem(UserId, "Title", description, Today, UtcNow);
+        var task = new TaskItem(UserId, "Title", description, Today, Today, UtcNow);
 
         task.Description.Should().BeNull();
     }
@@ -112,7 +112,7 @@ public class TaskItemTests
     {
         var description = new string('a', TaskItem.DescriptionMaxLength);
 
-        var task = new TaskItem(UserId, "Title", description, Today, UtcNow);
+        var task = new TaskItem(UserId, "Title", description, Today, Today, UtcNow);
 
         task.Description.Should().HaveLength(TaskItem.DescriptionMaxLength);
     }
@@ -122,7 +122,7 @@ public class TaskItemTests
     {
         var description = new string('a', TaskItem.DescriptionMaxLength + 1);
 
-        var act = () => new TaskItem(UserId, "Title", description, Today, UtcNow);
+        var act = () => new TaskItem(UserId, "Title", description, Today, Today, UtcNow);
 
         act.Should().Throw<DomainException>().WithMessage("Description cannot exceed 500 characters.");
     }
@@ -130,7 +130,7 @@ public class TaskItemTests
     [Fact]
     public void Create_WithDueDateToday_Succeeds()
     {
-        var task = new TaskItem(UserId, "Title", null, Today, UtcNow);
+        var task = new TaskItem(UserId, "Title", null, Today, Today, UtcNow);
 
         task.DueDate.Should().Be(Today);
     }
@@ -138,9 +138,21 @@ public class TaskItemTests
     [Fact]
     public void Create_WithDueDateInThePast_Throws()
     {
-        var act = () => new TaskItem(UserId, "Title", null, Today.AddDays(-1), UtcNow);
+        var act = () => new TaskItem(UserId, "Title", null, Today.AddDays(-1), Today, UtcNow);
 
         act.Should().Throw<DomainException>().WithMessage("Due date cannot be in the past.");
+    }
+
+    [Fact]
+    public void Create_ComparesDueDateWithBusinessTodayNotUtcDate()
+    {
+        // 21:00 in Bogotá (UTC-5) is already 02:00 of the next day in UTC.
+        var utcNow = new DateTime(2026, 11, 12, 2, 0, 0, DateTimeKind.Utc);
+        var businessToday = new DateOnly(2026, 11, 11);
+
+        var task = new TaskItem(UserId, "Title", null, businessToday, businessToday, utcNow);
+
+        task.DueDate.Should().Be(businessToday);
     }
 
     // ---------- Update ----------
