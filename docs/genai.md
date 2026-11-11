@@ -53,4 +53,47 @@ This file is updated at the end of every phase and becomes the "Generative AI to
 - Max lengths are public constants reused by validators and EF configuration (single source of truth).
 
 **Open point carried to Phase 3:** "today" is computed from UTC. For a user in Bogotá (UTC-5), after 19:00 local time
-the UTC date is already tomorrow, so a due date of "today" would be rejected. To be decided in the Application layer.
+the UTC date is already tomorrow, so a due date of "today" would be rejected. Resolved in Phase 3 (see below).
+
+### Phase 3 – Application (TDD, step by step)
+**Process change:** after Phase 2 the human asked to work in much smaller steps and to approve **every commit**.
+Each step now ends with: files shown → tests run (red or green) → explanation → explicit "yes" → commit.
+This produced a red → green pair per component, visible in the history.
+
+| Step | Commits |
+|---|---|
+| Contracts | `feat: add persistence and security abstractions` |
+| AuthService | red (11 failing) → green |
+| Time zone bug | red (test reproducing 21:00 Bogotá) → `fix` (green) → `refactor: introduce IClock` |
+| Folder layout | `refactor: organize DTOs and services in type folders` (human request) |
+| TaskService | red (15 failing) → green |
+| Validators | red (22 failing, 8 "accept" cases passing) → green |
+
+**Design decisions reviewed by the human:**
+- Application defines interfaces (`IUserRepository`, `ITaskRepository`, `IPasswordHasher`, `ITokenGenerator`, `IClock`);
+  Infrastructure will implement them (dependency inversion).
+- **Ownership is a business rule, so it lives in `TaskService`, not in the repository:** `GetByIdAsync(id)` returns any task and
+  `GetOwnedTaskAsync` throws `NotFoundException` when it is missing *or* owned by another user. Same 404 in both cases, so
+  task ids of other users cannot be discovered. Covered by tests for get, update and delete.
+- Login returns the same "Invalid email or password." for unknown email and wrong password (no account enumeration).
+- Register checks the email before hashing, because hashing is deliberately slow.
+- DTOs are `sealed record`s (immutable, value equality), one per file; `TaskDto` and `UserDto` never expose `UserId` or `PasswordHash`.
+  Separate `CreateTaskRequest` (no status: new tasks are always Pending) and `UpdateTaskRequest`.
+- Email normalization and format live once in the domain (`User.NormalizeEmail`, `User.IsValidEmail`) and are reused by
+  services and validators. Max lengths come from entity constants. Shared title/description rules in `TaskRules`.
+- Validators complement the domain: they return *all* errors at once for the UI and cover rules the domain cannot see
+  (password strength on register only; login checks presence only, to avoid giving hints to an attacker).
+
+**AI output corrected during review:**
+| Finding | Action |
+|---|---|
+| The time zone issue flagged in Phase 2. | Human chose a configured business time zone. A domain test reproducing 21:00 in Bogotá was written first (red), then the fix (green). |
+| The agent had first said a custom clock was unnecessary (`TimeProvider` is built in). | Revisited once "business today" was needed: `IClock` exposes `UtcNow` (audit) and `Today` (business date). The agent stated the change of position explicitly. |
+| Email normalization would have been duplicated in `AuthService`. | Exposed `User.NormalizeEmail` / `User.IsValidEmail` as a single source of truth. |
+| A validator using `GreaterThanOrEqualTo(clock.Today)` would freeze "today" when the validator is built. | Used `Must(date => date >= clock.Today)` so it is evaluated on every request. |
+| `git rm` of the last file in a folder also removed the folder, so creating the replacement file failed. | Caught immediately by the build; folder recreated. Reported to the human rather than hidden. |
+
+**Open points carried to later phases:**
+- Phase 4: `IClock` implementation reading the time zone from configuration (with a test for the Bogotá case).
+- Phase 5: run the validators automatically before controllers (400 with all errors) and map `ConflictException` → 409,
+  `UnauthorizedException` → 401, `NotFoundException` → 404, `DomainException` → 400 in the error middleware.
