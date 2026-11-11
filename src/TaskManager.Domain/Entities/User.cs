@@ -32,11 +32,15 @@ public sealed partial class User
     // Single source of truth: "Demo@X.com" and "demo@x.com" are the same account (used by register and login).
     public static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
 
+    // Single source of truth for the email format (used by the entity and by input validation).
+    public static bool IsValidEmail(string? email) =>
+        !string.IsNullOrWhiteSpace(email) && EmailFormat().IsMatch(NormalizeEmail(email));
+
     private static string ValidateEmail(string email)
     {
         var normalized = NormalizeEmail(Guard.RequiredMaxLength(email, EmailMaxLength, "Email"));
 
-        if (!EmailFormat().IsMatch(normalized))
+        if (!IsValidEmail(normalized))
         {
             throw new DomainException("Email format is not valid.");
         }
