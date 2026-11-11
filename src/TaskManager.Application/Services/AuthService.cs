@@ -2,9 +2,10 @@ using TaskManager.Application.Abstractions.Persistence;
 using TaskManager.Application.Abstractions.Security;
 using TaskManager.Application.Abstractions.Time;
 using TaskManager.Application.Common.Exceptions;
+using TaskManager.Application.Dtos.Auth;
 using TaskManager.Domain.Entities;
 
-namespace TaskManager.Application.Auth;
+namespace TaskManager.Application.Services;
 
 public sealed class AuthService(
     IUserRepository users,

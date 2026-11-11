@@ -2,12 +2,13 @@ using FluentAssertions;
 using Moq;
 using TaskManager.Application.Abstractions.Persistence;
 using TaskManager.Application.Abstractions.Security;
-using TaskManager.Application.Auth;
+using TaskManager.Application.Dtos.Auth;
+using TaskManager.Application.Services;
 using TaskManager.Application.Common.Exceptions;
 using TaskManager.Application.Tests.Common;
 using TaskManager.Domain.Entities;
 
-namespace TaskManager.Application.Tests.Auth;
+namespace TaskManager.Application.Tests.Services;
 
 public class AuthServiceTests
 {
