@@ -135,3 +135,33 @@ InMemory provider, so constraints such as the unique email index and the foreign
 **Open points carried to Phase 5:**
 - Register services (DI), bind `JwtOptions` and the time zone from appsettings, apply migrations and run `DbSeeder` on startup.
 - Run validators automatically and map application exceptions to HTTP status codes (400, 401, 404, 409).
+
+### Phase 5 – API (TDD with integration tests)
+Integration tests use `WebApplicationFactory`: the real `Program`, middleware and controllers, with a per-test
+in-memory SQLite database. Each step was a red → green pair approved by the human.
+
+| Step | What |
+|---|---|
+| Startup | Composition root, settings, migrations + seeder on startup, public `GET /api/health` |
+| Auth | Register / login / `me`, JWT bearer validation, validation filter, exception → ProblemDetails handler |
+| Tasks | CRUD with 201 + Location, 204, 404; end-to-end test where a second user cannot see, edit or delete the demo user's task |
+| Docs & CORS | OpenAPI + Swagger UI with an Authorize button; CORS restricted to the Angular origin |
+
+**Design decisions reviewed by the human:**
+- All dependency registration lives in the API (composition root), so inner layers need no DI/configuration packages.
+- Controllers contain no logic: validation runs in a global filter, errors are translated by one exception handler,
+  and the user id always comes from the token's `sub` claim.
+- Unknown exceptions return a generic 500 without internal details.
+- Status is serialized as text (`"Done"`) for readability and to avoid breaking clients if the enum is reordered.
+- HTTPS redirection removed so reviewers can run on plain http without dev certificates.
+
+**AI output corrected during review:**
+| Finding | Action |
+|---|---|
+| Settings were read while registering services; `WebApplicationFactory` adds its configuration later, so the tests saw no JWT key. | Switched to the options pattern (lazy binding) with `ValidateOnStart`, keeping fail-fast on a missing/short signing key. |
+| The first Swagger setup marked every endpoint as secured, including register, login and health. Tests passed; it was spotted by looking at the UI. | Operation transformer adds the security requirement only to `[Authorize]` endpoints. |
+| One red test (update unknown task → 404) passed before the route existed. | Called out explicitly; it passes for the right reason once the controller exists. |
+| A shell heredoc failed while writing a test file (quoting). | Nothing was written; files created with the editor tool instead. |
+
+**Manual end-to-end check:** fresh database → API start → demo login → `GET /api/tasks` (5 tasks, status as text,
+UTC dates) → 401 without token → Swagger UI shows the lock only on protected endpoints.
