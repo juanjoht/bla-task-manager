@@ -1,26 +1,33 @@
-import { Injectable } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { API_BASE_URL } from '../../core/api.config';
 import { CreateTaskRequest, Task, TaskStatus, UpdateTaskRequest } from '../../shared/models/task.model';
 
+/** HTTP client for /api/tasks. The bearer token is added by the auth interceptor. */
 @Injectable({ providedIn: 'root' })
 export class TaskService {
-  list(_status?: TaskStatus): Observable<Task[]> {
-    throw new Error('Not implemented');
+  private readonly http = inject(HttpClient);
+  private readonly url = `${inject(API_BASE_URL)}/tasks`;
+
+  list(status?: TaskStatus): Observable<Task[]> {
+    const params = status ? new HttpParams().set('status', status) : undefined;
+    return this.http.get<Task[]>(this.url, { params });
   }
 
-  get(_id: string): Observable<Task> {
-    throw new Error('Not implemented');
+  get(id: string): Observable<Task> {
+    return this.http.get<Task>(`${this.url}/${id}`);
   }
 
-  create(_request: CreateTaskRequest): Observable<Task> {
-    throw new Error('Not implemented');
+  create(request: CreateTaskRequest): Observable<Task> {
+    return this.http.post<Task>(this.url, request);
   }
 
-  update(_id: string, _request: UpdateTaskRequest): Observable<Task> {
-    throw new Error('Not implemented');
+  update(id: string, request: UpdateTaskRequest): Observable<Task> {
+    return this.http.put<Task>(`${this.url}/${id}`, request);
   }
 
-  delete(_id: string): Observable<void> {
-    throw new Error('Not implemented');
+  delete(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.url}/${id}`);
   }
 }

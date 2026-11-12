@@ -3,6 +3,12 @@ export type TaskStatus = 'Pending' | 'InProgress' | 'Done';
 
 export const TASK_STATUSES: readonly TaskStatus[] = ['Pending', 'InProgress', 'Done'];
 
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  Pending: 'Pending',
+  InProgress: 'In progress',
+  Done: 'Done',
+};
+
 /** Mirrors the API's TaskDto. Dates are ISO strings: dueDate "yyyy-MM-dd", audit fields in UTC. */
 export interface Task {
   id: string;

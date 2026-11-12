@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
+import { authGuard } from './core/auth.guard';
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'login' },
   {
     path: 'login',
     loadComponent: () => import('./features/auth/login/login-page').then((m) => m.LoginPage),
@@ -10,5 +10,18 @@ export const routes: Routes = [
     path: 'register',
     loadComponent: () => import('./features/auth/register/register-page').then((m) => m.RegisterPage),
   },
-  { path: '**', redirectTo: 'login' },
+  {
+    // Private area: the guard sends logged-out users to /login.
+    path: '',
+    canActivate: [authGuard],
+    loadComponent: () => import('./core/layout/app-shell').then((m) => m.AppShell),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'tasks' },
+      {
+        path: 'tasks',
+        loadComponent: () => import('./features/tasks/task-list/task-list-page').then((m) => m.TaskListPage),
+      },
+    ],
+  },
+  { path: '**', redirectTo: '' },
 ];

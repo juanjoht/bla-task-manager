@@ -1,0 +1,74 @@
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <h1 class="h3 mb-0">My tasks</h1>
+  <a class="btn btn-primary" routerLink="/tasks/new">+ New task</a>
+</div>
+
+<div class="row mb-3">
+  <div class="col-12 col-sm-6 col-md-4">
+    <label for="statusFilter" class="form-label small text-body-secondary mb-1">Filter by status</label>
+    <select #filter id="statusFilter" class="form-select" (change)="changeFilter(filter.value)">
+      <option value="">All</option>
+      @for (status of statuses; track status) {
+        <option [value]="status">{{ labels[status] }}</option>
+      }
+    </select>
+  </div>
+</div>
+
+@if (errorMessage(); as message) {
+  <div class="alert alert-danger" role="alert">{{ message }}</div>
+}
+
+@if (loading()) {
+  <div class="text-center py-5" role="status">
+    <span class="spinner-border text-primary" aria-hidden="true"></span>
+    <span class="visually-hidden">Loading tasks…</span>
+  </div>
+} @else if (tasks().length === 0 && !errorMessage()) {
+  <div class="text-center text-body-secondary py-5 border rounded bg-body-tertiary">
+    @if (statusFilter()) {
+      No tasks with this status.
+    } @else {
+      No tasks yet. <a routerLink="/tasks/new">Create your first task</a>.
+    }
+  </div>
+} @else {
+  <ul class="list-group shadow-sm">
+    @for (task of tasks(); track task.id) {
+      <li class="list-group-item py-3" data-testid="task">
+        <div class="d-flex flex-column flex-md-row gap-2 justify-content-between">
+          <div class="me-md-3">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+              <span class="fw-semibold" [class.text-decoration-line-through]="task.status === 'Done'">{{ task.title }}</span>
+              <span class="badge" [class]="badges[task.status]">{{ labels[task.status] }}</span>
+              @if (isOverdue(task)) {
+                <span class="badge text-bg-danger">Overdue</span>
+              }
+            </div>
+            @if (task.description) {
+              <p class="text-body-secondary small mb-1">{{ task.description }}</p>
+            }
+            <small class="text-body-secondary">Due {{ formatDueDate(task.dueDate) }}</small>
+          </div>
+
+          <div class="d-flex align-items-start gap-2 flex-shrink-0">
+            @if (pendingDeleteId() === task.id) {
+              <span class="small align-self-center">Delete this task?</span>
+              <button type="button" class="btn btn-danger btn-sm" data-testid="confirm-delete" (click)="confirmDelete(task.id)">
+                Yes, delete
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-testid="cancel-delete" (click)="cancelDelete()">
+                Cancel
+              </button>
+            } @else {
+              <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/tasks', task.id, 'edit']">Edit</a>
+              <button type="button" class="btn btn-outline-danger btn-sm" data-testid="delete" (click)="askToDelete(task.id)">
+                Delete
+              </button>
+            }
+          </div>
+        </div>
+      </li>
+    }
+  </ul>
+}
