@@ -46,8 +46,28 @@ export class AuthService {
 function readStoredSession(): AuthResponse | null {
   try {
     const stored = localStorage.getItem(SESSION_KEY);
-    return stored ? (JSON.parse(stored) as AuthResponse) : null;
+    const session = stored ? (JSON.parse(stored) as AuthResponse) : null;
+
+    if (session && isExpired(session.token)) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return session;
   } catch {
     return null; // corrupted value: start logged out
+  }
+}
+
+/**
+ * Reads the "exp" claim of a JWT. This is only a UX shortcut (skip a request that would fail with 401):
+ * the browser cannot verify the signature, so the API still validates every token.
+ */
+function isExpired(token: string): boolean {
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const { exp } = JSON.parse(atob(payload)) as { exp?: unknown };
+    return typeof exp !== 'number' || exp * 1000 <= Date.now();
+  } catch {
+    return true; // not a readable JWT
   }
 }
