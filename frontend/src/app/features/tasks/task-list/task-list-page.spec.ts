@@ -98,15 +98,17 @@ describe('TaskListPage', () => {
     expect(rows[1].textContent).not.toContain('Overdue');
   });
 
-  it('asks for confirmation before deleting', async () => {
-    taskService.list.mockReturnValue(of([task({ id: '1' })]));
+  it('asks for confirmation in a dialog that names the task', async () => {
+    taskService.list.mockReturnValue(of([task({ id: '1', title: 'Prepare demo' })]));
     await render();
 
     click('[data-testid=delete]');
     await fixture.whenStable();
 
+    const dialog = page.querySelector('[role=dialog]');
     expect(taskService.delete).not.toHaveBeenCalled();
-    expect(page.textContent).toContain('Delete this task?');
+    expect(dialog?.textContent).toContain('Delete task?');
+    expect(dialog?.textContent).toContain('Prepare demo');
   });
 
   it('deletes after confirming and removes the task from the list', async () => {
@@ -116,11 +118,12 @@ describe('TaskListPage', () => {
 
     click('[data-testid=delete]');
     await fixture.whenStable();
-    click('[data-testid=confirm-delete]');
+    click('[role=dialog] [data-testid=confirm]');
     await fixture.whenStable();
 
     expect(taskService.delete).toHaveBeenCalledWith('1');
     expect(page.textContent).not.toContain('To delete');
+    expect(page.querySelector('[role=dialog]')).toBeNull();
   });
 
   it('keeps the task when the deletion is cancelled', async () => {
@@ -129,12 +132,12 @@ describe('TaskListPage', () => {
 
     click('[data-testid=delete]');
     await fixture.whenStable();
-    click('[data-testid=cancel-delete]');
+    click('[role=dialog] [data-testid=cancel]');
     await fixture.whenStable();
 
     expect(taskService.delete).not.toHaveBeenCalled();
     expect(page.textContent).toContain('Keep me');
-    expect(page.textContent).not.toContain('Delete this task?');
+    expect(page.querySelector('[role=dialog]')).toBeNull();
   });
 
   it('shows the error when the tasks cannot be loaded', async () => {
