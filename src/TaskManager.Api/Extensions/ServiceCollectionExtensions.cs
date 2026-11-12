@@ -1,6 +1,7 @@
 using System.Text;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -75,6 +76,19 @@ public static class ServiceCollectionExtensions
                     ClockSkew = TimeSpan.FromSeconds(30)
                 };
             });
+
+        return services;
+    }
+
+    /// <summary>Allows only the configured browser origins (the Angular app) to call the API.</summary>
+    public static IServiceCollection AddFrontendCors(this IServiceCollection services)
+    {
+        services.AddCors();
+        services.AddOptions<CorsOptions>().Configure<IConfiguration>((cors, configuration) =>
+            cors.AddDefaultPolicy(policy => policy
+                .WithOrigins(configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
+                .AllowAnyHeader()
+                .AllowAnyMethod()));
 
         return services;
     }
