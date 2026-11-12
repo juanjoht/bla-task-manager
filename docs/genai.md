@@ -1,23 +1,193 @@
-# GenAI usage log
+# Generative AI tools
 
-Tool: **Claude Code** (desktop app), used as a pair programmer under explicit rules.
-This file is updated at the end of every phase and becomes the "Generative AI tools" section of the exercise.
+**Tool:** Claude Code (desktop app), used as a pair programmer: the AI proposed and wrote code, the human set the
+rules, reviewed every step and approved every commit. This document answers the exercise's GenAI section:
+the prompt (1), a representative sample of the output (2), and how the output was validated (3), corrected (4)
+and made robust for edge cases, authentication and validation (5). The appendix logs every phase in detail.
 
-## How the AI was steered
+---
 
-1. **Analysis first, code later.** Before writing any code, the exercise PDF was analysed with Claude to produce
-   two guardrail files that the agent reads at the start of every session:
-   - [`CLAUDE.md`](../CLAUDE.md): stack, Clean Architecture boundaries and non-negotiable rules
-     (TDD, no business logic in controllers, correct status codes, no unrequested packages, stop after each step).
-   - [`docs/PLAN.md`](PLAN.md): data model, endpoints, screens and phased delivery with a progress checklist.
-2. **Small, reviewable steps.** Every session prompt asks for one phase only, and the agent must stop for human review.
-3. **Kickoff prompt used:**
+## 1. The prompt
+
+### 1.1 Prompt to generate the task-management REST API
+This is the prompt I would use to generate the API in one go. It condenses what this project taught me about
+steering the model: give it context and hard constraints, list the edge cases explicitly, define "done" as tests,
+and make it stop for review instead of generating everything at once.
+
+```text
+You are a senior .NET engineer. Build a RESTful task-management API in C# / ASP.NET Core (.NET 10, controllers)
+following Clean Architecture and TDD.
+
+## Context
+- Users manage only their own tasks. A basic User model exists (Id, Email, Name, PasswordHash, CreatedAt).
+- Task: Id (Guid), Title, Description, Status, DueDate, UserId (owner), CreatedAt, UpdatedAt.
+
+## Architecture (dependencies point inwards)
+- Domain: entities that enforce their own invariants (private setters, validating constructor). No dependencies.
+- Application: use-case services, DTOs (records), FluentValidation validators, and the interfaces it needs
+  (ITaskRepository, IUserRepository, IPasswordHasher, ITokenGenerator, IClock). Depends only on Domain.
+- Infrastructure: EF Core + SQLite, repositories, password hasher, JWT generator, clock. Implements Application interfaces.
+- Api: thin controllers (no business logic), composition root, JWT bearer auth, global validation filter,
+  exception handler that returns ProblemDetails.
+
+## Business rules
+- Title: required (not blank), max 100. Description: optional, max 500, blank stored as null.
+- Status: Pending | InProgress | Done. New tasks always start as Pending.
+- DueDate is a calendar date (DateOnly). It cannot be in the past when CREATING (compare with "today" in the
+  configured business time zone, not UTC). Editing an overdue task must be allowed.
+- A user can only read/update/delete their own tasks. A task that does not exist OR belongs to someone else
+  returns 404 (never 403, so task ids cannot be discovered). This check lives in the Application service, not in SQL.
+
+## Endpoints
+- POST /api/auth/register (201 + Location, 400, 409 duplicate email), POST /api/auth/login (200 + JWT, 401),
+  GET /api/auth/me (token), GET /api/health (public).
+- GET /api/tasks?status=, GET /api/tasks/{id}, POST /api/tasks (201 + Location), PUT /api/tasks/{id} (200),
+  DELETE /api/tasks/{id} (204). All task endpoints require a token; the user id comes from the token's "sub" claim.
+- Errors: ProblemDetails. 400 returns every validation error at once. Unknown exceptions: generic 500, no internals.
+
+## Security
+- Passwords hashed with a salted, slow algorithm (use ASP.NET Core Identity's hasher; no custom crypto).
+- Same 401 message for unknown email and wrong password. Emails are case-insensitive and unique.
+- The JWT contains only sub, email and name; signing key from configuration, at least 32 characters, validated at startup.
+
+## Quality bar
+- Write the failing tests first (xUnit + FluentAssertions + Moq), show them, then the minimum code to pass.
+- Unit tests for Domain and Application; repository tests against real SQLite in memory (not the EF InMemory
+  provider); integration tests with WebApplicationFactory, including "user B cannot see/update/delete user A's task".
+- Nullable enabled, 0 build warnings, no dead code, no packages beyond the ones named here without asking.
+
+## Way of working
+- Before coding, summarize your understanding in 5 lines and list any assumption you had to make.
+- Deliver one layer at a time (Domain → Application → Infrastructure → Api) and stop after each for review.
+```
+
+### 1.2 How the AI was actually steered in this project
+The prompt above is the distilled version. In practice the work was driven in three layers:
+
+1. **Guardrail files, written before any code** by analysing the exercise PDF with Claude:
+   [`CLAUDE.md`](../CLAUDE.md) (stack, architecture boundaries, non-negotiable rules) and
+   [`docs/PLAN.md`](PLAN.md) (data model, endpoints, screens, phases). The agent reads both at the start of every session,
+   so the rules do not have to be repeated in each prompt.
+2. **Kickoff prompt:**
    > Read CLAUDE.md and docs/PLAN.md. Summarize the plan in 5 lines so I can confirm you understood it.
    > Then start Phase 1 and stop after it so I can review.
 
-   Asking for a summary first is a cheap check that the agent understood the plan before it changes anything.
+   The summary is a cheap check that the model understood the plan before it changes anything.
+3. **Steering prompts during the work**, which changed how the agent behaved for the rest of the project:
+   - *"Can we do this step by step so I can see what you are creating?"* → one small red → green step at a time.
+   - *"Please ask me before every commit."* → files, message and test results shown before each commit.
+   - *"Commits must not be under your name."* → no AI attribution in the history.
+   - Design questions that changed the output: *"why do the entities have so much logic?"* (refactor to a simpler
+     `Guard` style), *"can we split DTOs and services into folders?"*, *"the delete looks poor, can we use a dialog?"*.
 
-## Phase log
+---
+
+## 2. Representative output
+All of the code in this repository was generated through this process. A few representative pieces:
+
+**Domain entity that cannot be invalid** – [`TaskItem.cs`](../src/TaskManager.Domain/Entities/TaskItem.cs)
+```csharp
+public TaskItem(Guid userId, string title, string? description, DateOnly dueDate, DateOnly today, DateTime utcNow)
+{
+    Guard.NotEmpty(userId, "User id");
+    Guard.NotInPast(dueDate, today, "Due date");
+
+    Id = Guid.NewGuid();
+    UserId = userId;
+    Title = Guard.RequiredMaxLength(title, TitleMaxLength, "Title");
+    Description = Guard.OptionalMaxLength(description, DescriptionMaxLength, "Description");
+    Status = TaskItemStatus.Pending;
+    DueDate = dueDate;
+    CreatedAt = utcNow;
+    UpdatedAt = utcNow;
+}
+```
+
+**Ownership as a business rule** – [`TaskService.cs`](../src/TaskManager.Application/Services/TaskService.cs)
+```csharp
+// Same 404 for "does not exist" and "belongs to another user", so other users' task ids cannot be discovered.
+private async Task<TaskItem> GetOwnedTaskAsync(Guid userId, Guid taskId, CancellationToken cancellationToken)
+{
+    var task = await tasks.GetByIdAsync(taskId, cancellationToken);
+    if (task is null || task.UserId != userId)
+    {
+        throw new NotFoundException("Task not found.");
+    }
+
+    return task;
+}
+```
+
+**Thin controller** – [`TasksController.cs`](../src/TaskManager.Api/Controllers/TasksController.cs)
+```csharp
+[HttpPost]
+public async Task<ActionResult<TaskDto>> Create(CreateTaskRequest request, CancellationToken cancellationToken)
+{
+    var task = await taskService.CreateAsync(User.GetUserId(), request, cancellationToken);
+    return CreatedAtAction(nameof(GetById), new { id = task.Id }, task);
+}
+```
+
+**End-to-end ownership test** – [`TasksControllerTests.cs`](../tests/TaskManager.Api.Tests/Controllers/TasksControllerTests.cs)
+```csharp
+(await intruder.GetFromJsonAsync<List<TaskDto>>("/api/tasks", ApiJson.Options)).Should().BeEmpty();
+(await intruder.GetAsync($"/api/tasks/{demoTask.Id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+(await intruder.DeleteAsync($"/api/tasks/{demoTask.Id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+```
+
+**Size of the result:** 171 backend tests (Domain 48, Application 56, Infrastructure 38, Api 29) and 62 Angular tests,
+0 build warnings, delivered in 57 small commits, including 22 red (failing tests) → green (implementation) pairs
+where the red commit always comes first.
+
+---
+
+## 3. How the AI's suggestions were validated
+1. **Tests before code, and reading the red.** Every step started with failing tests. The failure messages were read,
+   not just counted: some tests passed "by accident" before the code existed (e.g. a 404 because the route did not exist
+   yet) and were called out; others were kept as protective tests that must stay green after the change.
+2. **Human review of every step and every commit.** Each step was shown (files, test output, explanation) and committed
+   only after an explicit "yes". Several design changes came from these reviews.
+3. **Zero warnings as a signal.** Build warnings were treated as findings (e.g. a vulnerable transitive package).
+4. **Running the real thing, not only the tests.** After each green step: the API with Swagger and curl, the Angular app in
+   a browser against the real API, the browser's console and network log, and a phone-width viewport.
+   Several issues that all tests passed were only visible this way.
+5. **Checking dependencies.** Package versions were matched to the .NET 10 LTS target, licenses checked
+   (FluentAssertions 8 is commercial → 7.2.2), and blocked npm install scripts inspected before deciding.
+
+## 4. Corrections and improvements to the AI output (highlights)
+| # | What the AI produced or claimed | Problem | Correction |
+|---|---|---|---|
+| 1 | Due date rule compared with `DateTime.UtcNow` | In Bogotá (UTC-5) after 19:00 a task due "today" was rejected | Domain receives the business "today"; `IClock` computes it from a configured time zone; a test reproduces 21:00 in Bogotá |
+| 2 | Settings read while registering services | Integration tests could not override them (no JWT key) | Options pattern with lazy binding and `ValidateOnStart` |
+| 3 | Swagger marked every endpoint as secured | Wrong docs for public endpoints (tests passed) | Operation transformer adds security only to `[Authorize]` endpoints |
+| 4 | Dates read back from SQLite | `Kind = Unspecified` → serialized without "Z" → shifted 5 h in the browser | Model-wide converter reads every `DateTime` as UTC (caught by a test) |
+| 5 | `DatePipe` for `"2026-11-14"` | Parsed as midnight UTC → shown as Nov 13 in Bogotá | Dates formatted from the local calendar |
+| 6 | Angular `Validators.email` / `required` | Accepted `user@domain` and blank titles that the API rejects | Same regex as the API and a `notBlank` validator |
+| 7 | `== PasswordVerificationResult.Success` | Would reject valid passwords whose hash uses older parameters | `!= Failed` |
+| 8 | Latest EF Core / Identity packages (11.0.0) | Target .NET 11, not the .NET 10 LTS of the project | Pinned 10.0.15 |
+| 9 | "Real SQLite enforces max lengths" | False (TEXT has no limit) | Corrected explicitly; lengths enforced by domain and validators |
+| 10 | Expired token kept in localStorage | 401 in the console and a flash of the list when coming back | Expired sessions dropped on startup (UX only; the API still validates) |
+| 11 | Rich entities with static factories | Correct but harder to explain | Human-driven refactor to constructors + `Guard` (assertions untouched, all tests green) |
+| 12 | Plain CSS proposed for the UI | Slower and less consistent given the deadline | Re-evaluated after the human asked; Bootstrap (CSS only) |
+
+## 5. Edge cases, authentication and validation
+- **Authentication:** JWT bearer with issuer, audience, signature and lifetime validated on every request; signing key
+  length validated at startup; passwords hashed with PBKDF2 + salt (ASP.NET Core Identity); the user id comes only from
+  the token; the frontend sends the token only to the API origin and logs out on 401.
+- **Authorization / ownership:** enforced in the Application service and proven by unit tests and an end-to-end HTTP test.
+  Foreign and missing tasks both return 404.
+- **No account enumeration:** same login error for unknown email and wrong password; emails normalized (trim + lower case)
+  and unique (validated in the service and enforced by a unique index).
+- **Validation in depth:** Angular forms (immediate feedback) → FluentValidation (all errors at once, 400) → Domain
+  invariants (last line of defence) → database constraints. Same limits and messages on every layer.
+- **Edge cases covered by tests:** blank and whitespace-only values, maximum lengths ±1, invalid enum values, past due dates
+  on create vs update, overdue tasks still editable and loadable, atomic updates (a failed update leaves the entity
+  unchanged), time zone boundaries, duplicate emails with different casing, invalid/expired tokens, idempotent seeding,
+  migrations in sync with the model.
+
+---
+
+## Appendix – phase-by-phase log
 
 ### Phase 1 – Solution structure
 **Generated:** solution (`.slnx`), 4 layer projects, 4 test projects, project references pointing inwards.
