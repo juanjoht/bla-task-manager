@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { apiErrorMessage } from '../../../shared/api-error';
+import { ConfirmDialog } from '../../../shared/ui/confirm-dialog';
 import { formatDueDate, todayIso } from '../../../shared/dates';
 import { Task, TASK_STATUS_LABELS, TASK_STATUSES, TaskStatus } from '../../../shared/models/task.model';
 import { TaskService } from '../task.service';
@@ -13,7 +14,7 @@ const STATUS_BADGES: Record<TaskStatus, string> = {
 
 @Component({
   selector: 'app-task-list-page',
-  imports: [RouterLink],
+  imports: [RouterLink, ConfirmDialog],
   templateUrl: './task-list-page.html',
 })
 export class TaskListPage implements OnInit {
@@ -29,7 +30,7 @@ export class TaskListPage implements OnInit {
   protected readonly statusFilter = signal<TaskStatus | ''>('');
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
-  protected readonly pendingDeleteId = signal<string | null>(null);
+  protected readonly taskToDelete = signal<Task | null>(null);
 
   ngOnInit(): void {
     this.load();
@@ -44,20 +45,14 @@ export class TaskListPage implements OnInit {
     return task.status !== 'Done' && task.dueDate < this.today;
   }
 
-  protected askToDelete(id: string): void {
-    this.pendingDeleteId.set(id);
-  }
-
-  protected cancelDelete(): void {
-    this.pendingDeleteId.set(null);
+  protected deleteMessage(task: Task): string {
+    return `"${task.title}" will be deleted permanently. This cannot be undone.`;
   }
 
   protected confirmDelete(id: string): void {
+    this.taskToDelete.set(null);
     this.taskService.delete(id).subscribe({
-      next: () => {
-        this.tasks.update((tasks) => tasks.filter((task) => task.id !== id));
-        this.pendingDeleteId.set(null);
-      },
+      next: () => this.tasks.update((tasks) => tasks.filter((task) => task.id !== id)),
       error: (error: unknown) => this.errorMessage.set(apiErrorMessage(error)),
     });
   }

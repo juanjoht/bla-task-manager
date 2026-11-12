@@ -48,27 +48,26 @@
             @if (task.description) {
               <p class="text-body-secondary small mb-1">{{ task.description }}</p>
             }
-            <small class="text-body-secondary">Due {{ formatDueDate(task.dueDate) }}</small>
+            <small class="text-body-secondary fw-semibold">Due: </small> <small class="text-body-secondary">{{ formatDueDate(task.dueDate) }}</small>
           </div>
 
           <div class="d-flex align-items-start gap-2 flex-shrink-0">
-            @if (pendingDeleteId() === task.id) {
-              <span class="small align-self-center">Delete this task?</span>
-              <button type="button" class="btn btn-danger btn-sm" data-testid="confirm-delete" (click)="confirmDelete(task.id)">
-                Yes, delete
-              </button>
-              <button type="button" class="btn btn-outline-secondary btn-sm" data-testid="cancel-delete" (click)="cancelDelete()">
-                Cancel
-              </button>
-            } @else {
-              <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/tasks', task.id, 'edit']">Edit</a>
-              <button type="button" class="btn btn-outline-danger btn-sm" data-testid="delete" (click)="askToDelete(task.id)">
-                Delete
-              </button>
-            }
+            <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/tasks', task.id, 'edit']">Edit</a>
+            <button type="button" class="btn btn-outline-danger btn-sm" data-testid="delete" (click)="taskToDelete.set(task)">
+              Delete
+            </button>
           </div>
         </div>
       </li>
     }
   </ul>
+}
+
+@if (taskToDelete(); as task) {
+  <app-confirm-dialog
+    title="Delete task?"
+    [message]="deleteMessage(task)"
+    confirmLabel="Delete"
+    (confirmed)="confirmDelete(task.id)"
+    (cancelled)="taskToDelete.set(null)" />
 }
