@@ -7,7 +7,20 @@ import { AuthService } from './auth.service';
 
 const API = 'http://localhost:5276/api';
 const demoUser = { id: '1', email: 'demo@ballastlane.test', name: 'Demo User' };
-const authResponse: AuthResponse = { token: 'jwt-token', user: demoUser };
+
+/** A JWT-shaped token whose payload expires the given number of seconds from now (signature is irrelevant here). */
+function fakeJwt(expiresInSeconds: number): string {
+  const encode = (value: object) =>
+    btoa(JSON.stringify(value)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
+  return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ sub: '1', exp })}.signature`;
+}
+
+function storeSession(token: string) {
+  localStorage.setItem('taskManager.session', JSON.stringify({ token, user: demoUser }));
+}
+
+const authResponse: AuthResponse = { token: fakeJwt(3600), user: demoUser };
 
 describe('AuthService', () => {
   let http: HttpTestingController;
@@ -40,7 +53,7 @@ describe('AuthService', () => {
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({ email: demoUser.email, password: 'Demo123!' });
     expect(service.isAuthenticated()).toBe(true);
-    expect(service.token()).toBe('jwt-token');
+    expect(service.token()).toBe(authResponse.token);
     expect(service.currentUser()).toEqual(demoUser);
   });
 
@@ -65,6 +78,28 @@ describe('AuthService', () => {
 
     expect(reloaded.isAuthenticated()).toBe(true);
     expect(reloaded.currentUser()).toEqual(demoUser);
+  });
+
+  it('forgets a stored session whose token has already expired', () => {
+    // Avoids a request that would fail with 401 (and a flash of the task list) when coming back hours later.
+    storeSession(fakeJwt(-60));
+
+    const service = createService();
+
+    expect(service.isAuthenticated()).toBe(false);
+    expect(localStorage.getItem('taskManager.session')).toBeNull();
+  });
+
+  it('keeps a stored session whose token is still valid', () => {
+    storeSession(fakeJwt(600));
+
+    expect(createService().isAuthenticated()).toBe(true);
+  });
+
+  it('treats a malformed stored token as no session', () => {
+    storeSession('not-a-jwt');
+
+    expect(createService().isAuthenticated()).toBe(false);
   });
 
   it('registers: posts the new user and does not log in automatically', () => {
