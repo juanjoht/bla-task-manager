@@ -1,6 +1,6 @@
 # Implementation Plan – Task Manager (Ballast Lane exercise)
 
-Deadline: presentation Friday Nov 13, 10:00 am (Bogotá). Read CLAUDE.md first for rules.
+Deadline: code submission Friday Nov 13, 10:00 am (Bogotá); the presentation is a later stage. Read CLAUDE.md first for rules.
 
 ## Data model
 
@@ -64,7 +64,7 @@ Cross-cutting: error middleware returning ProblemDetails, Swagger/OpenAPI with J
 - [x] Phase 1
 - [x] Phase 2
 - [x] Phase 3
-- [ ] Phase 4
+- [x] Phase 4
 - [ ] Phase 5
 - [ ] Phase 6
 - [ ] Phase 7
