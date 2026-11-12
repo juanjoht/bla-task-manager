@@ -165,3 +165,41 @@ in-memory SQLite database. Each step was a red → green pair approved by the hu
 
 **Manual end-to-end check:** fresh database → API start → demo login → `GET /api/tasks` (5 tasks, status as text,
 UTC dates) → 401 without token → Swagger UI shows the lock only on protected endpoints.
+
+### Phase 6 – Angular frontend (TDD with Vitest)
+Same red → green rhythm with a human-approved commit per step. After each green step the UI was checked in a
+real browser against the running API (desktop and phone width, console open).
+
+| Step | What |
+|---|---|
+| Scaffold | Angular 22 (standalone, Vitest, no SSR) + Bootstrap 5 CSS |
+| Core | `AuthService` (session in a signal + localStorage), auth interceptor, auth guard |
+| Auth pages | Login and register with the API's validation rules and messages |
+| Tasks | `TaskService`, guarded app shell, task list (filter, overdue badge, empty states) |
+| Task form | One page for create and edit |
+| Delete dialog | Reusable accessible `ConfirmDialog` (human request: the inline confirmation looked poor) |
+| Expired session | Stored sessions with an expired token are dropped on startup |
+
+**Design decisions reviewed by the human:**
+- **Bootstrap (CSS only)** instead of hand-written CSS: the agent first proposed plain CSS (zero dependencies); after the
+  human asked, it re-weighed against the deadline and recommended Bootstrap for a consistent responsive UI. Bootstrap's
+  JavaScript is not used; Angular controls all interaction (the modal is Bootstrap markup shown with `@if`).
+- State with services + signals (no NgRx); `inject()` for dependencies; reactive forms; lazy-loaded routes.
+- Token in `localStorage` for simplicity (trade-off vs an httpOnly cookie documented for the presentation).
+- The interceptor sends the token **only** to the API origin and logs out on 401, except for login/register
+  (there a 401 means "wrong password", not "expired token").
+- Frontend validation mirrors the API exactly (same email regex, password rules, limits and messages); the API still
+  validates everything, since the client cannot be trusted.
+
+**AI output corrected during review:**
+| Finding | Action |
+|---|---|
+| Angular's `Validators.email` accepts `user@domain`, which the API rejects. | Used the API's own regex so both sides agree. |
+| `Validators.required` accepts a title made only of spaces; the API rejects it. | Added a `notBlank` validator. |
+| `DatePipe` on `"2026-11-14"` reads it as midnight UTC → shown as Nov 13 in Bogotá. | Due dates are parsed and formatted from the local calendar (`shared/dates.ts`). |
+| Coming back after the 60-minute token lifetime produced a `GET /api/tasks` → 401 in the console and a flash of the list. Found by reading the browser's network log. | `AuthService` drops stored sessions whose JWT `exp` has passed (UX only; the API still validates every token). |
+| Long shell heredocs truncated two files while writing Angular code. | Caught before running tests; all code is now written with the editor tool. |
+| Several red tests passed before the code existed (e.g. "never send the token to other hosts"). | Kept and called out as protective tests that must stay green after the implementation. |
+
+**Browser console:** no warnings from the app. The only red line browsers print is the network log of an intentional
+failed login (401), which every browser shows for 4xx responses.

@@ -1,14 +1,33 @@
 # Task Manager – Ballast Lane technical exercise
 
-A small task manager built with **.NET 10**, **Clean Architecture** and **TDD**.
+A small task manager built with **.NET 10** (API) and **Angular 22** (UI), following **Clean Architecture** and **TDD**.
 
 > **User story:** As a registered user, I want to log in and manage my tasks (create, view, edit, delete)
 > so that I can organize my work. Each task has a title, description, status and due date, and belongs to the logged-in user.
 
 ## Prerequisites
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [Node.js 22](https://nodejs.org/) (includes npm) for the Angular app
 
 No database installation is needed: the API uses **SQLite** and creates its database file on first run.
+
+## Quick start
+Run the API and the web app in two terminals, from the repository root:
+
+```bash
+dotnet run --project src/TaskManager.Api --launch-profile http
+```
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+Open **http://localhost:4200** and sign in with the demo account below.
+
+> `npm install` may report that a few install scripts were blocked (`esbuild`, `lmdb`, `@parcel/watcher`,
+> `msgpackr-extract`). They belong to Angular's build tooling and are not needed: build and tests work without them.
 
 ## Run the API
 ```bash
@@ -36,11 +55,37 @@ The demo user has 5 sample tasks in different statuses, with due dates relative 
 To start again from a clean database, stop the API and delete `src/TaskManager.Api/taskmanager.db`.
 
 ## Run the tests
+Backend:
 ```bash
 dotnet test TaskManager.slnx
 ```
 Unit tests for Domain and Application, SQLite-backed tests for Infrastructure, and in-memory integration tests
 (`WebApplicationFactory`) that call the real HTTP endpoints.
+
+Frontend (Vitest):
+```bash
+cd frontend
+npm test -- --watch=false
+```
+
+## Web app (Angular)
+| Page | Route | Access |
+|---|---|---|
+| Sign in (shows the demo credentials) | `/login` | Public |
+| Create account | `/register` | Public |
+| My tasks: status filter, overdue badge, edit, delete with a confirmation dialog | `/tasks` | Logged in |
+| New task / Edit task | `/tasks/new`, `/tasks/:id/edit` | Logged in |
+
+```
+frontend/src/app/
+  core/       AuthService (session in a signal + localStorage), auth interceptor (bearer token, logout on 401),
+              auth guard, API base URL, app shell (top bar)
+  features/   auth/ (login, register) and tasks/ (TaskService, list, form)
+  shared/     models mirroring the API DTOs, form validators with the API's rules, error messages,
+              date helpers, reusable confirm dialog
+```
+Standalone components, signals for state (no NgRx), reactive forms, lazy-loaded routes and Bootstrap 5 styles
+(CSS only, no Bootstrap JavaScript). The UI is responsive down to phone width.
 
 ## API
 
