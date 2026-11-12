@@ -21,6 +21,14 @@ export const routes: Routes = [
         path: 'tasks',
         loadComponent: () => import('./features/tasks/task-list/task-list-page').then((m) => m.TaskListPage),
       },
+      {
+        path: 'tasks/new',
+        loadComponent: () => import('./features/tasks/task-form/task-form-page').then((m) => m.TaskFormPage),
+      },
+      {
+        path: 'tasks/:id/edit',
+        loadComponent: () => import('./features/tasks/task-form/task-form-page').then((m) => m.TaskFormPage),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

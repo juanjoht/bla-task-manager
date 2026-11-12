@@ -8,6 +8,15 @@ export function matches(rule: RegExp, errorKey: string): ValidatorFn {
   return (control) => (!control.value || rule.test(control.value) ? null : { [errorKey]: true });
 }
 
+/** Like Validators.required, but a value made only of spaces also counts as empty (same as the API). */
+export const notBlank: ValidatorFn = (control) =>
+  typeof control.value === 'string' && control.value.trim() ? null : { required: true };
+
+/** Fails with "past" when an ISO date ("yyyy-MM-dd") is before the given minimum. */
+export function notBefore(minimumIsoDate: string): ValidatorFn {
+  return (control) => (!control.value || control.value >= minimumIsoDate ? null : { past: true });
+}
+
 /** The message for the first failing validator, shown only after the user touched the field or submitted. */
 export function firstError(control: AbstractControl, messages: Record<string, string>): string | null {
   if (!control.touched || !control.errors) {
