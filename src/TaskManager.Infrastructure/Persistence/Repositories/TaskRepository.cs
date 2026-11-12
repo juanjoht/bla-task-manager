@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using TaskManager.Application.Abstractions.Persistence;
 using TaskManager.Domain.Entities;
 using TaskManager.Domain.Enums;
@@ -6,14 +7,36 @@ namespace TaskManager.Infrastructure.Persistence.Repositories;
 
 public sealed class TaskRepository(AppDbContext db) : ITaskRepository
 {
-    public Task<IReadOnlyList<TaskItem>> ListByUserAsync(Guid userId, TaskItemStatus? status, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+    public async Task<IReadOnlyList<TaskItem>> ListByUserAsync(Guid userId, TaskItemStatus? status, CancellationToken cancellationToken)
+    {
+        var query = db.Tasks.AsNoTracking().Where(t => t.UserId == userId);
 
-    public Task<TaskItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => throw new NotImplementedException();
+        if (status is not null)
+        {
+            query = query.Where(t => t.Status == status);
+        }
 
-    public Task AddAsync(TaskItem task, CancellationToken cancellationToken) => throw new NotImplementedException();
+        return await query.OrderBy(t => t.DueDate).ThenBy(t => t.CreatedAt).ToListAsync(cancellationToken);
+    }
 
-    public Task UpdateAsync(TaskItem task, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public Task<TaskItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        db.Tasks.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
-    public Task DeleteAsync(TaskItem task, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public async Task AddAsync(TaskItem task, CancellationToken cancellationToken)
+    {
+        db.Tasks.Add(task);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateAsync(TaskItem task, CancellationToken cancellationToken)
+    {
+        db.Tasks.Update(task);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteAsync(TaskItem task, CancellationToken cancellationToken)
+    {
+        db.Tasks.Remove(task);
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }
