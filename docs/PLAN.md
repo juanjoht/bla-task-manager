@@ -68,4 +68,4 @@ Cross-cutting: error middleware returning ProblemDetails, Swagger/OpenAPI with J
 - [x] Phase 5
 - [x] Phase 6
 - [x] Phase 7
-- [ ] Phase 8
+- [x] Phase 8

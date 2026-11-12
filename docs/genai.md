@@ -373,3 +373,20 @@ real browser against the running API (desktop and phone width, console open).
 
 **Browser console:** no warnings from the app. The only red line browsers print is the network log of an intentional
 failed login (401), which every browser shows for 4xx responses.
+
+### Phase 7 – GenAI section
+The exercise's GenAI questions are answered at the top of this document (prompt, representative output, validation,
+corrections, edge cases). Claims were checked against the repository before committing: the agent first wrote
+"~80 commits" without counting; the real figure (57 commits, 22 red → green pairs) replaced it.
+
+### Phase 8 – Clean clone check
+The repository was cloned **from GitHub** into an empty folder and the README was followed as a reviewer would:
+- `dotnet test TaskManager.slnx` → 171 passed, 0 warnings (packages restored from scratch).
+- `cd frontend && npm install && npm test -- --watch=false` → 62 passed (npm shows the documented blocked-scripts notice);
+  `npm run build` succeeds.
+- The API started with no database file: migrations applied, demo user and 5 tasks seeded, health 200, 401 without
+  token, demo login and task list OK, Swagger UI served. `git status` stayed clean (the SQLite files are ignored).
+- Every file linked from the README and from this document exists in the clone.
+
+The Angular UI itself was verified end to end in the browser during Phase 6; in the clone check it was built and
+unit-tested, not served, because the default ports were already in use by the development instances.
