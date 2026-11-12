@@ -1,6 +1,9 @@
+using System.Text;
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using TaskManager.Application.Abstractions.Persistence;
 using TaskManager.Application.Abstractions.Security;
 using TaskManager.Application.Abstractions.Time;
@@ -52,6 +55,26 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IValidator<LoginRequest>, LoginRequestValidator>();
         services.AddScoped<IValidator<CreateTaskRequest>, CreateTaskRequestValidator>();
         services.AddScoped<IValidator<UpdateTaskRequest>, UpdateTaskRequestValidator>();
+
+        return services;
+    }
+
+    /// <summary>Validates incoming bearer tokens with the same issuer, audience and key used to create them.</summary>
+    public static IServiceCollection AddJwtAuthentication(this IServiceCollection services)
+    {
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+            .Configure<JwtOptions>((bearer, jwt) =>
+            {
+                bearer.MapInboundClaims = false; // keep "sub", "email", "name" as issued
+                bearer.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidIssuer = jwt.Issuer,
+                    ValidAudience = jwt.Audience,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
+                    ClockSkew = TimeSpan.FromSeconds(30)
+                };
+            });
 
         return services;
     }
